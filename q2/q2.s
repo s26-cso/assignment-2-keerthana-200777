@@ -4,13 +4,12 @@
 .extern printf
 
 .section .rodata
-# Format string for space-separated integers
-res_fmt: .string "%d "
+res_fmt: .string "%d"
+space_fmt: .string " "
 newline: .string "\n"
 
 .text
 main:
-    # 1. Setup stack frame (64 bytes, 16-byte aligned)
     addi sp, sp, -64
     sd ra, 56(sp)
     sd s0, 48(sp)   # n (number of elements)
@@ -21,14 +20,12 @@ main:
     sd s5, 8(sp)    # i (loop counter)
     sd s6, 0(sp)    # argv storage
 
-    # 2. Handle Arguments
     addi s0, a0, -1      # s0 = argc - 1
     li t0, 1
-    blt s0, t0, exit_all # Exit if no numbers provided
-    
-    mv s6, a1            # CRITICAL: Save argv in s6 to survive malloc
+    blt s0, t0, exit_all
 
-    # Allocate memory for input array, result array, and stack
+    mv s6, a1            # save argv to survive malloc
+
     slli a0, s0, 2
     call malloc
     mv s1, a0
@@ -41,26 +38,24 @@ main:
     call malloc
     mv s3, a0
 
-    # 3. Convert argv strings to integers
     li s5, 0
 load_loop:
     bge s5, s0, start_logic
-    
+
     addi t0, s5, 1
     slli t0, t0, 3       # 8-byte offset for argv pointers
     add t0, s6, t0
-    ld a0, 0(t0)         # Load string pointer
-    
-    call atoi            
-    
+    ld a0, 0(t0)         # load string pointer
+
+    call atoi
+
     slli t1, s5, 2
     add t1, s1, t1
-    sw a0, 0(t1)         # Store in arr[i]
-    
+    sw a0, 0(t1)         # store in arr[i]
+
     addi s5, s5, 1
     j load_loop
 
-# 4. Monotonic Stack Logic O(n)
 start_logic:
     li s4, -1            # stack top = -1
     addi s5, s0, -1      # i = n - 1 (iterate backwards)
@@ -69,13 +64,12 @@ main_algo:
     blt s5, zero, print_results
 
 pop_while:
-    blt s4, zero, pop_done 
+    blt s4, zero, pop_done
 
-    # Compare arr[stack[top]] with arr[i]
     slli t0, s4, 2
     add t0, s3, t0
     lw t1, 0(t0)         # t1 = index from stack
-    
+
     slli t1, t1, 2
     add t1, s1, t1
     lw t2, 0(t1)         # t2 = value at stack[top]
@@ -84,18 +78,16 @@ pop_while:
     add t3, s1, t3
     lw t4, 0(t3)         # t4 = value at arr[i]
 
-    # Stop popping if top is strictly greater [cite:64,69]
-    bgt t2, t4, pop_done
-    
+    bgt t2, t4, pop_done # stop popping if top is strictly greater
+
     addi s4, s4, -1      # pop()
     j pop_while
 
 pop_done:
     slli t0, s5, 2
-    add t0, s2, t0       # Address of res[i]
-    
+    add t0, s2, t0       # address of res[i]
+
     blt s4, zero, set_minus
-    # res[i] = stack[top]
     slli t1, s4, 2
     add t1, s3, t1
     lw t2, 0(t1)
@@ -103,7 +95,7 @@ pop_done:
     j push_curr
 
 set_minus:
-    li t1, -1            # No greater element found [cite:70,76]
+    li t1, -1            # no greater element found
     sw t1, 0(t0)
 
 push_curr:
@@ -115,12 +107,16 @@ push_curr:
     addi s5, s5, -1
     j main_algo
 
-# 5. Output results
 print_results:
     li s5, 0
 out_loop:
     bge s5, s0, exit_all
-    
+
+    beqz s5, no_space    # first element, skip space
+    la a0, space_fmt
+    call printf
+
+no_space:
     la a0, res_fmt
     slli t0, s5, 2
     add t0, s2, t0
@@ -134,7 +130,6 @@ exit_all:
     la a0, newline
     call printf
 
-    # Restore and Return
     ld s6, 0(sp)
     ld s5, 8(sp)
     ld s4, 16(sp)
